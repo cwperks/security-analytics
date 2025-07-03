@@ -6,6 +6,7 @@ package org.opensearch.securityanalytics.transport;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.checker.units.qual.C;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRunnable;
 import org.opensearch.action.StepListener;
@@ -42,6 +43,7 @@ import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
 import org.opensearch.securityanalytics.util.DetectorIndices;
 import org.opensearch.securityanalytics.util.ExceptionChecker;
 import org.opensearch.securityanalytics.util.MonitorService;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.RuleTopicIndices;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.securityanalytics.util.ThrowableCheckingPredicates;
@@ -71,6 +73,8 @@ public class TransportDeleteDetectorAction extends HandledTransportAction<Delete
 
     private final Client client;
 
+    private final PluginClient pluginClient;
+
     private final RuleTopicIndices ruleTopicIndices;
 
     private final NamedXContentRegistry xContentRegistry;
@@ -93,19 +97,20 @@ public class TransportDeleteDetectorAction extends HandledTransportAction<Delete
     private final ExceptionChecker exceptionChecker;
 
     @Inject
-    public TransportDeleteDetectorAction(TransportService transportService, IndexTemplateManager indexTemplateManager, Client client,
+    public TransportDeleteDetectorAction(TransportService transportService, IndexTemplateManager indexTemplateManager, PluginClient pluginClient,
                                          ActionFilters actionFilters, NamedXContentRegistry xContentRegistry, RuleTopicIndices ruleTopicIndices,
                                          DetectorIndices detectorIndices, ClusterService clusterService, Settings settings,
-                                         ExceptionChecker exceptionChecker) {
+                                         ExceptionChecker exceptionChecker, ThreadPool threadPool, Client client) {
         super(DeleteDetectorAction.NAME, transportService, actionFilters, DeleteDetectorRequest::new);
+        this.pluginClient = pluginClient;
         this.client = client;
         this.ruleTopicIndices = ruleTopicIndices;
         this.xContentRegistry = xContentRegistry;
-        this.threadPool = client.threadPool();
+        this.threadPool = threadPool;
         this.indexTemplateManager = indexTemplateManager;
         this.detectorIndices = detectorIndices;
-        this.monitorService = new MonitorService(client);
-        this.workflowService = new WorkflowService(client, monitorService);
+        this.monitorService = new MonitorService(pluginClient);
+        this.workflowService = new WorkflowService(pluginClient, monitorService);
         this.clusterService = clusterService;
         this.settings = settings;
 
@@ -128,7 +133,7 @@ public class TransportDeleteDetectorAction extends HandledTransportAction<Delete
     private void deleteDetector(String detectorId, WriteRequest.RefreshPolicy refreshPolicy, ActionListener<DeleteResponse> listener) {
         DeleteRequest request = new DeleteRequest(Detector.DETECTORS_INDEX, detectorId)
                 .setRefreshPolicy(refreshPolicy);
-        client.delete(request, listener);
+        pluginClient.delete(request, listener);
     }
 
     class AsyncDeleteDetectorAction {
@@ -162,10 +167,9 @@ public class TransportDeleteDetectorAction extends HandledTransportAction<Delete
                 return;
 
             }
-            TransportDeleteDetectorAction.this.threadPool.getThreadContext().stashContext();
             String detectorId = request.getDetectorId();
             GetRequest getRequest = new GetRequest(Detector.DETECTORS_INDEX, detectorId);
-            client.get(getRequest,
+            pluginClient.get(getRequest,
                     new ActionListener<>() {
                         @Override
                         public void onResponse(GetResponse response) {

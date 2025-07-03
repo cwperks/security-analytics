@@ -42,6 +42,7 @@ import org.opensearch.securityanalytics.model.CorrelationRuleTrigger;
 import org.opensearch.securityanalytics.model.Detector;
 import org.opensearch.securityanalytics.transport.TransportCorrelateFindingAction;
 import org.opensearch.securityanalytics.util.AutoCorrelationsRepo;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.transport.client.Client;
 
 import java.io.IOException;
@@ -59,7 +60,7 @@ import java.util.stream.Collectors;
 
 public class JoinEngine {
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final PublishFindingsRequest request;
 
@@ -83,10 +84,10 @@ public class JoinEngine {
 
     private final User user;
 
-    public JoinEngine(Client client, PublishFindingsRequest request, NamedXContentRegistry xContentRegistry,
+    public JoinEngine(PluginClient pluginClient, PublishFindingsRequest request, NamedXContentRegistry xContentRegistry,
                       long corrTimeWindow, TimeValue indexTimeout, TransportCorrelateFindingAction.AsyncCorrelateFindingAction correlateFindingAction,
                       LogTypeService logTypeService, boolean enableAutoCorrelations, CorrelationAlertService correlationAlertService, NotificationService notificationService, User user) {
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.request = request;
         this.xContentRegistry = xContentRegistry;
         this.corrTimeWindow = corrTimeWindow;
@@ -155,7 +156,7 @@ public class JoinEngine {
             }
 
             if (!mSearchRequest.requests().isEmpty()) {
-                client.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
+                pluginClient.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
                     MultiSearchResponse.Item[] responses = items.getResponses();
 
                     Map<String, List<String>> autoCorrelationsMap = new HashMap<>();
@@ -235,7 +236,7 @@ public class JoinEngine {
         searchRequest.preference(Preference.PRIMARY_FIRST.type());
         searchRequest.setCancelAfterTimeInterval(TimeValue.timeValueSeconds(30L));
 
-        client.search(searchRequest, ActionListener.wrap(response -> {
+        pluginClient.search(searchRequest, ActionListener.wrap(response -> {
             if (response.isTimedOut()) {
                 onFailure(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
             }
@@ -306,7 +307,7 @@ public class JoinEngine {
         }
 
         if (!mSearchRequest.requests().isEmpty()) {
-            client.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
+            pluginClient.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
                 MultiSearchResponse.Item[] responses = items.getResponses();
                 List<FilteredCorrelationRule> filteredCorrelationRules = new ArrayList<>();
 
@@ -404,7 +405,7 @@ public class JoinEngine {
         }
 
         if (!mSearchRequest.requests().isEmpty()) {
-            client.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
+            pluginClient.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
                 MultiSearchResponse.Item[] responses = items.getResponses();
                 Map<String, DocSearchCriteria> relatedDocsMap = new HashMap<>();
 
@@ -470,7 +471,7 @@ public class JoinEngine {
         }
 
         if (!mSearchRequest.requests().isEmpty()) {
-            client.multiSearch(mSearchRequest, ActionListener.wrap( items -> {
+            pluginClient.multiSearch(mSearchRequest, ActionListener.wrap( items -> {
                 MultiSearchResponse.Item[] responses = items.getResponses();
                 Map<String, List<String>> filteredRelatedDocIds = new HashMap<>();
 
@@ -532,7 +533,7 @@ public class JoinEngine {
         }
 
         if (!mSearchRequest.requests().isEmpty()) {
-            client.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
+            pluginClient.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
                 MultiSearchResponse.Item[] responses = items.getResponses();
                 Map<String, List<String>> correlatedFindings = new HashMap<>();
 
@@ -558,7 +559,7 @@ public class JoinEngine {
                 }
 
                 if (!correlatedFindings.isEmpty()) {
-                     CorrelationRuleScheduler correlationRuleScheduler = new CorrelationRuleScheduler(client, correlationAlertService, notificationService);
+                     CorrelationRuleScheduler correlationRuleScheduler = new CorrelationRuleScheduler(pluginClient, correlationAlertService, notificationService);
                      correlationRuleScheduler.schedule(correlationRules, correlatedFindings, request.getFinding().getId(), indexTimeout, user);
                 }
 

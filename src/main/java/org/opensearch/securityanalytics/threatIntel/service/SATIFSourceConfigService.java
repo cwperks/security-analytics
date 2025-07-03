@@ -52,6 +52,7 @@ import org.opensearch.securityanalytics.threatIntel.common.TIFLockService;
 import org.opensearch.securityanalytics.threatIntel.model.DefaultIocStoreConfig;
 import org.opensearch.securityanalytics.threatIntel.model.SATIFSourceConfig;
 import org.opensearch.securityanalytics.util.IndexUtils;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
@@ -86,20 +87,20 @@ import static org.opensearch.securityanalytics.util.IndexUtils.shouldUpdateIndex
  */
 public class SATIFSourceConfigService {
     private static final Logger log = LogManager.getLogger(SATIFSourceConfigService.class);
-    private final Client client;
+    private final PluginClient pluginClient;
     private final ClusterService clusterService;
     private final ClusterSettings clusterSettings;
     private final ThreadPool threadPool;
     private final NamedXContentRegistry xContentRegistry;
     private final TIFLockService lockService;
 
-    public SATIFSourceConfigService(final Client client,
+    public SATIFSourceConfigService(final PluginClient pluginClient,
                                     final ClusterService clusterService,
                                     ThreadPool threadPool,
                                     NamedXContentRegistry xContentRegistry,
                                     final TIFLockService lockService
     ) {
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.clusterSettings = clusterService.getClusterSettings();
         this.threadPool = threadPool;
@@ -121,7 +122,7 @@ public class SATIFSourceConfigService {
                         .timeout(clusterSettings.get(INDEX_TIMEOUT));
 
                 log.debug("Indexing tif source config");
-                client.index(indexRequest, ActionListener.wrap(
+                pluginClient.index(indexRequest, ActionListener.wrap(
                         response -> {
                             log.debug("Threat intel source config with id [{}] indexed success.", response.getId());
                             SATIFSourceConfig responseSaTifSourceConfig = createSATIFSourceConfig(saTifSourceConfig, response);
@@ -208,7 +209,7 @@ public class SATIFSourceConfigService {
         } else {
             final CreateIndexRequest createIndexRequest = new CreateIndexRequest(SecurityAnalyticsPlugin.JOB_INDEX_NAME).mapping(getIndexMapping())
                     .settings(SecurityAnalyticsPlugin.TIF_JOB_INDEX_SETTING);
-            client.admin().indices().create(createIndexRequest, ActionListener.wrap(
+            pluginClient.admin().indices().create(createIndexRequest, ActionListener.wrap(
                     r -> {
                         log.debug("[{}] index created", SecurityAnalyticsPlugin.JOB_INDEX_NAME);
                         stepListener.onResponse(null);
@@ -232,7 +233,7 @@ public class SATIFSourceConfigService {
                 log.info("Old schema version found for [{}] index, updating the index mapping", SecurityAnalyticsPlugin.JOB_INDEX_NAME);
                 IndexUtils.updateIndexMapping(
                         SecurityAnalyticsPlugin.JOB_INDEX_NAME,
-                        getIndexMapping(), clusterService.state(), client.admin().indices(),
+                        getIndexMapping(), clusterService.state(), pluginClient.admin().indices(),
                         ActionListener.wrap(
                                 r -> {
                                     log.info("Successfully updated index mapping for [{}] index", SecurityAnalyticsPlugin.JOB_INDEX_NAME);
@@ -273,7 +274,7 @@ public class SATIFSourceConfigService {
             ActionListener<SATIFSourceConfig> actionListener
     ) {
         GetRequest getRequest = new GetRequest(SecurityAnalyticsPlugin.JOB_INDEX_NAME, tifSourceConfigId);
-        client.get(getRequest, ActionListener.wrap(
+        pluginClient.get(getRequest, ActionListener.wrap(
                 getResponse -> {
                     if (!getResponse.isExists()) {
                         actionListener.onFailure(SecurityAnalyticsException.wrap(new OpenSearchStatusException(String.format(Locale.ROOT, "Threat intel source config [%s] not found.", tifSourceConfigId), RestStatus.NOT_FOUND)));
@@ -306,7 +307,7 @@ public class SATIFSourceConfigService {
     ) {
         SearchRequest searchRequest = getSearchRequest(searchSourceBuilder);
 
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 searchResponse -> {
                     if (searchResponse.isTimedOut()) {
                         actionListener.onFailure(SecurityAnalyticsException.wrap(new OpenSearchStatusException("Search threat intel source configs request timed out", RestStatus.REQUEST_TIMEOUT)));
@@ -372,7 +373,7 @@ public class SATIFSourceConfigService {
                     .id(saTifSourceConfig.getId())
                     .timeout(clusterSettings.get(INDEX_TIMEOUT));
 
-            client.index(indexRequest, ActionListener.wrap(response -> {
+            pluginClient.index(indexRequest, ActionListener.wrap(response -> {
                         log.debug("Threat intel source config with id [{}] update success.", response.getId());
                         SATIFSourceConfig responseSaTifSourceConfig = createSATIFSourceConfig(saTifSourceConfig, response);
                         actionListener.onResponse(responseSaTifSourceConfig);
@@ -402,7 +403,7 @@ public class SATIFSourceConfigService {
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 .timeout(clusterSettings.get(INDEX_TIMEOUT));
 
-        client.delete(request, ActionListener.wrap(
+        pluginClient.delete(request, ActionListener.wrap(
                 deleteResponse -> {
                     if (deleteResponse.status().equals(RestStatus.OK)) {
                         log.info("Deleted threat intel source config [{}] successfully", saTifSourceConfig.getId());
@@ -440,7 +441,7 @@ public class SATIFSourceConfigService {
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 .timeout(clusterSettings.get(INDEX_TIMEOUT));
 
-        client.delete(request, ActionListener.wrap(
+        pluginClient.delete(request, ActionListener.wrap(
                 deleteResponse -> {
                     if (deleteResponse.status().equals(RestStatus.OK)) {
                         log.info("Deleted threat intel job scheduler lock [{}] successfully", id);
@@ -461,7 +462,7 @@ public class SATIFSourceConfigService {
     public void deleteAllIocIndices(Set<String> indicesToDelete, Boolean backgroundJob, ActionListener<AcknowledgedResponse> listener) {
         if (indicesToDelete.isEmpty() == false) {
             DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(indicesToDelete.toArray(new String[0]));
-            client.admin().indices().delete(
+            pluginClient.admin().indices().delete(
                     deleteIndexRequest,
                     ActionListener.wrap(
                             deleteIndicesResponse -> {
@@ -488,7 +489,7 @@ public class SATIFSourceConfigService {
     private void deleteIocIndex(Set<String> indicesToDelete, Boolean backgroundJob, ActionListener<AcknowledgedResponse> listener) {
         for (String index : indicesToDelete) {
             final DeleteIndexRequest singleDeleteRequest = new DeleteIndexRequest(indicesToDelete.toArray(new String[0]));
-            client.admin().indices().delete(
+            pluginClient.admin().indices().delete(
                     singleDeleteRequest,
                     ActionListener.wrap(
                             response -> {
@@ -523,7 +524,7 @@ public class SATIFSourceConfigService {
                 .metadata(true)
                 .local(true)
                 .indicesOptions(IndicesOptions.strictExpand());
-        client.admin().cluster().state(
+        pluginClient.admin().cluster().state(
                 clusterStateRequest,
                 ActionListener.wrap(
                         clusterStateResponse -> {
@@ -550,7 +551,7 @@ public class SATIFSourceConfigService {
                 ).preference(Preference.PRIMARY_FIRST.type());
 
         // Search if there is only one threat intel source config left
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 saTifSourceConfigResponse -> {
                     if (saTifSourceConfigResponse.getHits().getHits().length <= 1) {
                         String alertingConfigIndex = ".opendistro-alerting-config";
@@ -576,7 +577,7 @@ public class SATIFSourceConfigService {
                             boolQueryBuilder.filter(bqb);
                             newSearchRequest.source().query(boolQueryBuilder); // TODO: remove this once logic is moved to transport layer
 
-                            client.execute(SearchThreatIntelMonitorAction.INSTANCE, new SearchThreatIntelMonitorRequest(newSearchRequest), ActionListener.wrap(
+                            pluginClient.execute(SearchThreatIntelMonitorAction.INSTANCE, new SearchThreatIntelMonitorRequest(newSearchRequest), ActionListener.wrap(
                                     response -> {
                                         if (response.getHits().getHits().length == 0) {
                                             log.debug("All threat intel monitors are deleted, continuing deleting threat intel source config");
@@ -622,7 +623,7 @@ public class SATIFSourceConfigService {
         queryBuilder.must(stateQueryBuilder);
 
         searchRequest.source().query(queryBuilder);
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 searchResponse -> {
                     Map<String, List<String>> cumulativeIocTypeToIndices = new HashMap<>();
                     for (SearchHit hit : searchResponse.getHits().getHits()) {

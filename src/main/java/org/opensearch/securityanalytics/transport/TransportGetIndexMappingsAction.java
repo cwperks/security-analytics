@@ -44,8 +44,6 @@ public class TransportGetIndexMappingsAction extends HandledTransportAction<GetI
 
     @Override
     protected void doExecute(Task task, GetIndexMappingsRequest request, ActionListener<GetIndexMappingsResponse> actionListener) {
-        this.threadPool.getThreadContext().stashContext();
-
         mapperService.getMappingAction(request.getIndexName(), actionListener);
     }
 }

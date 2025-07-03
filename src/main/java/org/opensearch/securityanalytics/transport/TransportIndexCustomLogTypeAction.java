@@ -163,7 +163,6 @@ public class TransportIndexCustomLogTypeAction extends HandledTransportAction<In
         }
 
         void start() {
-            TransportIndexCustomLogTypeAction.this.threadPool.getThreadContext().stashContext();
             try {
                 if (!customLogTypeIndices.customLogTypeIndexExists()) {
                     customLogTypeIndices.initCustomLogTypeIndex(new ActionListener<>() {

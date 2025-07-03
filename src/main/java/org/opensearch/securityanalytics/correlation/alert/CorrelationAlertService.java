@@ -41,6 +41,7 @@ import org.opensearch.search.sort.SortOrder;
 import org.opensearch.securityanalytics.action.AckCorrelationAlertsResponse;
 import org.opensearch.securityanalytics.action.GetCorrelationAlertsResponse;
 import org.opensearch.securityanalytics.util.CorrelationIndices;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.transport.client.Client;
 import java.io.IOException;
 import java.time.Instant;
@@ -53,7 +54,7 @@ public class CorrelationAlertService {
     private static final Logger log = LogManager.getLogger(CorrelationAlertService.class);
 
     private final NamedXContentRegistry xContentRegistry;
-    private final Client client;
+    private final PluginClient pluginClient;
 
     protected static final String CORRELATED_FINDING_IDS = "correlated_finding_ids";
     protected static final String CORRELATION_RULE_ID = "correlation_rule_id";
@@ -73,8 +74,8 @@ public class CorrelationAlertService {
     protected static final String NO_ID = "";
     protected static final long NO_VERSION = Versions.NOT_FOUND;
 
-    public CorrelationAlertService(Client client, NamedXContentRegistry xContentRegistry) {
-        this.client = client;
+    public CorrelationAlertService(PluginClient pluginClient, NamedXContentRegistry xContentRegistry) {
+        this.pluginClient = pluginClient;
         this.xContentRegistry = xContentRegistry;
     }
 
@@ -101,7 +102,7 @@ public class CorrelationAlertService {
         SearchRequest searchRequest = new SearchRequest(CorrelationIndices.CORRELATION_ALERT_INDEX)
                 .source(searchSourceBuilder);
 
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 searchResponse -> {
                     if (searchResponse.getHits().getTotalHits().equals(0)) {
                         listener.onResponse(new CorrelationAlertsList(Collections.emptyList(), 0));
@@ -145,7 +146,7 @@ public class CorrelationAlertService {
                     .source(builder)
                     .timeout(indexTimeout);
 
-            client.index(indexRequest, listener);
+            pluginClient.index(indexRequest, listener);
         } catch (IOException ex) {
             log.error("Exception while adding alerts in .opensearch-sap-correlation-alerts index", ex);
         }
@@ -176,7 +177,7 @@ public class CorrelationAlertService {
         SearchRequest searchRequest = new SearchRequest(CorrelationIndices.CORRELATION_ALERT_INDEX)
                 .source(searchSourceBuilder);
 
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 searchResponse -> {
                     if (searchResponse.getHits().getTotalHits().equals(0)) {
                         listener.onResponse(new GetCorrelationAlertsResponse(Collections.emptyList(), 0));
@@ -210,7 +211,7 @@ public class CorrelationAlertService {
                 .source(searchSourceBuilder);
 
         // Execute the search request
-        client.search(searchRequest, new ActionListener<SearchResponse>() {
+        pluginClient.search(searchRequest, new ActionListener<SearchResponse>() {
             @Override
             public void onResponse(SearchResponse searchResponse) {
                 // Set the refresh policy on the BulkRequest
@@ -239,7 +240,7 @@ public class CorrelationAlertService {
                 // Check if there are any update requests in the bulk request
                 if (!bulkRequest.requests().isEmpty()) {
                     // Execute the bulk request asynchronously
-                    client.bulk(bulkRequest, new ActionListener<BulkResponse>() {
+                    pluginClient.bulk(bulkRequest, new ActionListener<BulkResponse>() {
                         @Override
                         public void onResponse(BulkResponse bulkResponse) {
                             // Iterate through the bulk response to identify failed updates
@@ -282,7 +283,7 @@ public class CorrelationAlertService {
                 .source(searchSourceBuilder);
 
         // Execute the search request
-        client.search(searchRequest, new ActionListener<SearchResponse>() {
+        pluginClient.search(searchRequest, new ActionListener<SearchResponse>() {
             @Override
             public void onResponse(SearchResponse searchResponse) {
                 // Iterate through the search hits
@@ -296,7 +297,7 @@ public class CorrelationAlertService {
                             .script(script);
                     // Add the update request to the bulk request
                     bulkRequest.add(updateRequest);
-                    client.bulk(bulkRequest);
+                    pluginClient.bulk(bulkRequest);
                 }
             }
             @Override

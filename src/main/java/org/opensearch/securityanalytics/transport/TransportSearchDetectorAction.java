@@ -20,6 +20,7 @@ import org.opensearch.securityanalytics.action.SearchDetectorRequest;
 import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
 import org.opensearch.securityanalytics.threatIntel.transport.TransportPutTIFJobAction;
 import org.opensearch.securityanalytics.util.DetectorIndices;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -29,7 +30,7 @@ import static org.opensearch.securityanalytics.util.DetectorUtils.getEmptySearch
 
 public class TransportSearchDetectorAction extends HandledTransportAction<SearchDetectorRequest, SearchResponse> implements SecureTransportAction {
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final NamedXContentRegistry xContentRegistry;
 
@@ -49,10 +50,10 @@ public class TransportSearchDetectorAction extends HandledTransportAction<Search
 
 
     @Inject
-    public TransportSearchDetectorAction(TransportPutTIFJobAction tifJobAction, TransportService transportService, ClusterService clusterService, DetectorIndices detectorIndices, ActionFilters actionFilters, NamedXContentRegistry xContentRegistry, Settings settings, Client client) {
+    public TransportSearchDetectorAction(TransportPutTIFJobAction tifJobAction, TransportService transportService, ClusterService clusterService, DetectorIndices detectorIndices, ActionFilters actionFilters, NamedXContentRegistry xContentRegistry, Settings settings, PluginClient pluginClient) {
         super(SearchDetectorAction.NAME, transportService, actionFilters, SearchDetectorRequest::new);
         this.xContentRegistry = xContentRegistry;
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.detectorIndices = detectorIndices;
         this.clusterService = clusterService;
         this.threadPool = this.detectorIndices.getThreadPool();
@@ -74,12 +75,11 @@ public class TransportSearchDetectorAction extends HandledTransportAction<Search
             addFilter(user, searchDetectorRequest.searchRequest().source(), "detector.user.backend_roles.keyword");
         }
 
-        this.threadPool.getThreadContext().stashContext();
         if (!detectorIndices.detectorIndexExists()) {
             actionListener.onResponse(getEmptySearchResponse());
             return;
         }
-        client.search(searchDetectorRequest.searchRequest(), new ActionListener<>() {
+        pluginClient.search(searchDetectorRequest.searchRequest(), new ActionListener<>() {
             @Override
             public void onResponse(SearchResponse response) {
                 actionListener.onResponse(response);

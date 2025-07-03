@@ -52,6 +52,7 @@ import org.opensearch.securityanalytics.threatIntel.model.SATIFSourceConfig;
 import org.opensearch.securityanalytics.threatIntel.service.DefaultTifSourceConfigLoaderService;
 import org.opensearch.securityanalytics.threatIntel.service.SATIFSourceConfigService;
 import org.opensearch.securityanalytics.transport.SecureTransportAction;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -79,11 +80,11 @@ public class TransportListIOCsAction extends HandledTransportAction<ListIOCsActi
     private final ClusterService clusterService;
     private final TransportSearchTIFSourceConfigsAction transportSearchTIFSourceConfigsAction;
     private final DefaultTifSourceConfigLoaderService defaultTifSourceConfigLoaderService;
-    private final Client client;
+    private final PluginClient pluginClient;
     private final NamedXContentRegistry xContentRegistry;
-    private final ThreadPool threadPool;
     private final SATIFSourceConfigService saTifSourceConfigService;
     private final Settings settings;
+    private final ThreadPool threadPool;
     private volatile Boolean filterByEnabled;
     private final IocFindingService iocFindingService;
 
@@ -97,7 +98,8 @@ public class TransportListIOCsAction extends HandledTransportAction<ListIOCsActi
             TransportSearchTIFSourceConfigsAction transportSearchTIFSourceConfigsAction,
             SATIFSourceConfigService saTifSourceConfigService,
             DefaultTifSourceConfigLoaderService defaultTifSourceConfigLoaderService,
-            Client client,
+            PluginClient pluginClient,
+            ThreadPool threadPool,
             NamedXContentRegistry xContentRegistry,
             ActionFilters actionFilters,
             Settings settings
@@ -107,12 +109,12 @@ public class TransportListIOCsAction extends HandledTransportAction<ListIOCsActi
         this.transportSearchTIFSourceConfigsAction = transportSearchTIFSourceConfigsAction;
         this.saTifSourceConfigService = saTifSourceConfigService;
         this.defaultTifSourceConfigLoaderService = defaultTifSourceConfigLoaderService;
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.xContentRegistry = xContentRegistry;
-        this.threadPool = this.client.threadPool();
         this.settings = settings;
+        this.threadPool = threadPool;
         this.filterByEnabled = SecurityAnalyticsSettings.FILTER_BY_BACKEND_ROLES.get(this.settings);
-        this.iocFindingService = new IocFindingService(client, clusterService, xContentRegistry);
+        this.iocFindingService = new IocFindingService(pluginClient, clusterService, xContentRegistry);
     }
 
     @Override
@@ -138,13 +140,12 @@ public class TransportListIOCsAction extends HandledTransportAction<ListIOCsActi
 
         void start() {
             // validate user
-            User user = readUserFromThreadContext(TransportListIOCsAction.this.threadPool);
+            User user = readUserFromThreadContext(threadPool);
             String validateBackendRoleMessage = validateUserBackendRoles(user, TransportListIOCsAction.this.filterByEnabled);
             if (!"".equals(validateBackendRoleMessage)) {
                 listener.onFailure(new OpenSearchStatusException("Do not have permissions to resource", RestStatus.FORBIDDEN));
                 return;
             }
-            TransportListIOCsAction.this.threadPool.getThreadContext().stashContext(); // stash context to make calls as admin client
 
             StepListener<Void> defaultTifConfigsLoadedListener = null;
             try {
@@ -230,7 +231,7 @@ public class TransportListIOCsAction extends HandledTransportAction<ListIOCsActi
                     .source(searchSourceBuilder)
                     .preference(Preference.PRIMARY_FIRST.type());
 
-            client.search(searchRequest, new ActionListener<>() {
+            pluginClient.search(searchRequest, new ActionListener<>() {
                 @Override
                 public void onResponse(SearchResponse searchResponse) {
                     if (searchResponse.isTimedOut()) {

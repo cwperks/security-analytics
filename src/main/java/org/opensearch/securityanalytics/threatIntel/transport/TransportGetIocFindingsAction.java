@@ -89,7 +89,6 @@ public class TransportGetIocFindingsAction extends HandledTransportAction<GetIoc
             actionListener.onFailure(new OpenSearchStatusException("Do not have permissions to resource", RestStatus.FORBIDDEN));
             return;
         }
-        this.threadPool.getThreadContext().stashContext();
 
         Table tableProp = request.getTable();
         FieldSortBuilder sortBuilder = SortBuilders
@@ -151,7 +150,6 @@ public class TransportGetIocFindingsAction extends HandledTransportAction<GetIoc
         }
         searchSourceBuilder.query(queryBuilder).trackTotalHits(true);
 
-        this.threadPool.getThreadContext().stashContext();
         iocFindingService.search(searchSourceBuilder, new ActionListener<>() {
             @Override
             public void onResponse(SearchResponse searchResponse) {

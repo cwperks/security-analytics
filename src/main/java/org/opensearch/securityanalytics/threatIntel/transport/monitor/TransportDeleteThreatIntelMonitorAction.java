@@ -61,7 +61,9 @@ public class TransportDeleteThreatIntelMonitorAction extends HandledTransportAct
             listener.onFailure(SecurityAnalyticsException.wrap(new OpenSearchStatusException(validateBackendRoleMessage, RestStatus.FORBIDDEN)));
             return;
         }
-        this.threadPool.getThreadContext().stashContext();
+        // TODO Figure out how to remove this
+        // Perhaps the AlertingPluginInterface instance should already have been initialized with the alerting plugin's PluginSubject? Similar to JS LockService
+        // this.threadPool.getThreadContext().stashContext();
 
         AlertingPluginInterface.INSTANCE.deleteMonitor((NodeClient) client,
                 new DeleteMonitorRequest(request.getMonitorId(), WriteRequest.RefreshPolicy.IMMEDIATE),

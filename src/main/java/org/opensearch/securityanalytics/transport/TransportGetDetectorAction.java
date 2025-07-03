@@ -27,6 +27,7 @@ import org.opensearch.securityanalytics.model.Detector;
 import org.opensearch.securityanalytics.action.GetDetectorRequest;
 import org.opensearch.securityanalytics.action.GetDetectorResponse;
 import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.securityanalytics.util.DetectorIndices;
 import org.opensearch.tasks.Task;
@@ -41,7 +42,7 @@ import static org.opensearch.core.rest.RestStatus.OK;
 
 public class TransportGetDetectorAction extends HandledTransportAction<GetDetectorRequest, GetDetectorResponse> implements SecureTransportAction {
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final NamedXContentRegistry xContentRegistry;
 
@@ -59,10 +60,10 @@ public class TransportGetDetectorAction extends HandledTransportAction<GetDetect
 
 
     @Inject
-    public TransportGetDetectorAction(TransportService transportService, ActionFilters actionFilters, DetectorIndices detectorIndices, ClusterService clusterService, NamedXContentRegistry xContentRegistry, Client client, Settings settings) {
+    public TransportGetDetectorAction(TransportService transportService, ActionFilters actionFilters, DetectorIndices detectorIndices, ClusterService clusterService, NamedXContentRegistry xContentRegistry, PluginClient pluginClient, Settings settings) {
         super(GetDetectorAction.NAME, transportService, actionFilters, GetDetectorRequest::new);
         this.xContentRegistry = xContentRegistry;
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.detectorIndices = detectorIndices;
         this.clusterService = clusterService;
         this.threadPool = this.detectorIndices.getThreadPool();
@@ -83,12 +84,10 @@ public class TransportGetDetectorAction extends HandledTransportAction<GetDetect
             return;
         }
 
-        this.threadPool.getThreadContext().stashContext();
-
         GetRequest getRequest = new GetRequest(Detector.DETECTORS_INDEX, request.getDetectorId())
                 .version(request.getVersion());
 
-        client.get(getRequest, new ActionListener<>() {
+        pluginClient.get(getRequest, new ActionListener<>() {
             @Override
             public void onResponse(GetResponse response) {
                 try {

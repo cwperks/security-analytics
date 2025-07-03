@@ -25,6 +25,7 @@ import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.securityanalytics.action.SearchCorrelationRuleAction;
 import org.opensearch.securityanalytics.action.SearchCorrelationRuleRequest;
 import org.opensearch.securityanalytics.util.CorrelationRuleIndices;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -35,7 +36,7 @@ public class TransportSearchCorrelationRuleAction extends HandledTransportAction
 
     private static final Logger log = LogManager.getLogger(TransportSearchCorrelationRuleAction.class);
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final CorrelationRuleIndices correlationRuleIndices;
 
@@ -66,14 +67,14 @@ public class TransportSearchCorrelationRuleAction extends HandledTransportAction
     @Inject
     public TransportSearchCorrelationRuleAction(
         TransportService transportService,
-        Client client,
+        PluginClient pluginClient,
         ActionFilters actionFilters,
         ClusterService clusterService,
         ThreadPool threadPool,
         CorrelationRuleIndices correlationRuleIndices
     ) {
         super(SearchCorrelationRuleAction.NAME, transportService, actionFilters, SearchCorrelationRuleRequest::new);
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.correlationRuleIndices = correlationRuleIndices;
         this.threadPool = threadPool;
@@ -81,9 +82,7 @@ public class TransportSearchCorrelationRuleAction extends HandledTransportAction
 
     @Override
     protected void doExecute(Task task, SearchCorrelationRuleRequest request, ActionListener<SearchResponse> listener) {
-        this.threadPool.getThreadContext().stashContext();
-
-        client.search(
+        pluginClient.search(
             request.getSearchRequest(),
             new ActionListener<>() {
                 @Override

@@ -39,7 +39,6 @@ public class TransportGetMappingsViewAction extends HandledTransportAction<GetMa
 
     @Override
     protected void doExecute(Task task, GetMappingsViewRequest request, ActionListener<GetMappingsViewResponse> actionListener) {
-        this.threadPool.getThreadContext().stashContext();
         this.mapperService.getMappingsViewAction(request.getIndexName(), request.getRuleTopic(), actionListener);
     }
 }

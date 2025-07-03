@@ -45,6 +45,7 @@ import org.opensearch.securityanalytics.threatIntel.model.SATIFSourceConfig;
 import org.opensearch.securityanalytics.threatIntel.model.UrlDownloadSource;
 import org.opensearch.securityanalytics.threatIntel.service.TIFJobParameterService;
 import org.opensearch.securityanalytics.threatIntel.util.ThreatIntelFeedParser;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.transport.client.Client;
 import software.amazon.awssdk.core.exception.SdkException;
@@ -80,7 +81,7 @@ public class STIX2IOCFetchService {
     public final String REGION_REGEX = "^.{1,20}$";
     public final String ROLE_ARN_REGEX = "^arn:aws:iam::\\d{12}:role/[\\w+=,.@-]{1,64}$";
 
-    private Client client;
+    private PluginClient pluginClient;
     private ClusterService clusterService;
     private STIX2IOCConnectorFactory connectorFactory;
     private S3ClientFactory s3ClientFactory;
@@ -88,8 +89,8 @@ public class STIX2IOCFetchService {
     private Integer batchSize;
     private String internalAuthEndpoint = "";
 
-    public STIX2IOCFetchService(Client client, ClusterService clusterService) {
-        this.client = client;
+    public STIX2IOCFetchService(PluginClient pluginClient, ClusterService clusterService) {
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.internalAuthEndpoint = getEndpoint();
 
@@ -110,7 +111,7 @@ public class STIX2IOCFetchService {
     public void onlyIndexIocs(SATIFSourceConfig saTifSourceConfig,
                               List<STIX2IOC> stix2IOCList,
                               ActionListener<STIX2IOCFetchResponse> listener) {
-        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(client, clusterService, saTifSourceConfig, listener);
+        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(pluginClient, clusterService, saTifSourceConfig, listener);
         Instant startTime = Instant.now();
         Instant endTime;
         Exception exception = null;
@@ -150,7 +151,7 @@ public class STIX2IOCFetchService {
         }
 
         Connector<STIX2> s3Connector = constructS3Connector(s3ConnectorConfig, saTifSourceConfig);
-        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(client, clusterService, saTifSourceConfig, listener);
+        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(pluginClient, clusterService, saTifSourceConfig, listener);
         STIX2IOCConsumer consumer = new STIX2IOCConsumer(batchSize, feedStore, UpdateType.REPLACE, saTifSourceConfig);
 
         Instant startTime = Instant.now();
@@ -394,7 +395,7 @@ public class STIX2IOCFetchService {
             );
             iocs.add(stix2IOC);
         }
-        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(client, clusterService, saTifSourceConfig, listener);
+        STIX2IOCFeedStore feedStore = new STIX2IOCFeedStore(pluginClient, clusterService, saTifSourceConfig, listener);
         feedStore.indexIocs(iocs);
     }
 

@@ -108,7 +108,6 @@ public class TransportDeleteCustomLogTypeAction extends HandledTransportAction<D
             listener.onFailure(SecurityAnalyticsException.wrap(new OpenSearchStatusException(validateBackendRoleMessage, RestStatus.FORBIDDEN)));
             return;
         }
-        this.threadPool.getThreadContext().stashContext();
         AsyncDeleteCustomLogTypeAction deleteCustomLogTypeAction = new AsyncDeleteCustomLogTypeAction(task, request, listener);
         deleteCustomLogTypeAction.start();
     }
