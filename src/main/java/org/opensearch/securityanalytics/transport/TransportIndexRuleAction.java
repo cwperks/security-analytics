@@ -137,7 +137,6 @@ public class TransportIndexRuleAction extends HandledTransportAction<IndexRuleRe
         }
 
         void start() {
-            TransportIndexRuleAction.this.threadPool.getThreadContext().stashContext();
             logTypeService.doesLogTypeExist(request.getLogType().toLowerCase(Locale.ROOT), new ActionListener<>() {
                 @Override
                 public void onResponse(Boolean exist) {

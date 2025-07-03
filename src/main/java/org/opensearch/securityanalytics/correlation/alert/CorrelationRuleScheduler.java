@@ -19,6 +19,7 @@ import org.opensearch.securityanalytics.correlation.alert.notifications.Notifica
 import org.opensearch.securityanalytics.correlation.alert.notifications.CorrelationAlertContext;
 import org.opensearch.commons.alerting.model.action.Action;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.transport.client.Client;
 import java.time.Instant;
@@ -30,12 +31,12 @@ import java.util.Map;
 public class CorrelationRuleScheduler {
 
     private final Logger log = LogManager.getLogger(CorrelationRuleScheduler.class);
-    private final Client client;
+    private final PluginClient pluginClient;
     private final CorrelationAlertService correlationAlertService;
     private final NotificationService notificationService;
 
-    public CorrelationRuleScheduler(Client client, CorrelationAlertService correlationAlertService, NotificationService notificationService) {
-        this.client = client;
+    public CorrelationRuleScheduler(PluginClient pluginClient, CorrelationAlertService correlationAlertService, NotificationService notificationService) {
+        this.pluginClient = pluginClient;
         this.correlationAlertService = correlationAlertService;
         this.notificationService = notificationService;
     }

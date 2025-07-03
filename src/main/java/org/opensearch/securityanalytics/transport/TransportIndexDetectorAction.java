@@ -1171,8 +1171,6 @@ public class TransportIndexDetectorAction extends HandledTransportAction<IndexDe
         }
 
         void start() {
-            log.debug("stash context");
-            TransportIndexDetectorAction.this.threadPool.getThreadContext().stashContext();
             log.debug("log type check : {}", request.getDetector().getDetectorType());
             logTypeService.doesLogTypeExist(request.getDetector().getDetectorType().toLowerCase(Locale.ROOT), new ActionListener<>() {
                 @Override

@@ -25,6 +25,7 @@ import org.opensearch.rest.action.admin.indices.AliasesNotFoundException;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.securityanalytics.model.threatintel.BaseEntity;
 import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.transport.RemoteTransportException;
 import org.opensearch.transport.client.Client;
 
@@ -43,12 +44,12 @@ import static org.opensearch.securityanalytics.util.DetectorUtils.getEmptySearch
 public abstract class BaseEntityCrudService<Entity extends BaseEntity> {
     // todo rollover
     private static final Logger log = LogManager.getLogger(BaseEntityCrudService.class);
-    private final Client client;
+    private final PluginClient pluginClient;
     private final ClusterService clusterService;
     private final NamedXContentRegistry xContentRegistry;
 
-    public BaseEntityCrudService(Client client, ClusterService clusterService, NamedXContentRegistry xContentRegistry) {
-        this.client = client;
+    public BaseEntityCrudService(PluginClient pluginClient, ClusterService clusterService, NamedXContentRegistry xContentRegistry) {
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
     }
@@ -122,7 +123,7 @@ public abstract class BaseEntityCrudService<Entity extends BaseEntity> {
 
                         for (BulkRequest req : bulkRequestList) {
                             try {
-                                client.bulk(req, groupedListener);
+                                pluginClient.bulk(req, groupedListener);
                             } catch (Exception e) {
                                 log.error(
                                         () -> new ParameterizedMessage("Failed to bulk save {} {}.", batchSize, getEntityName()),
@@ -184,7 +185,7 @@ public abstract class BaseEntityCrudService<Entity extends BaseEntity> {
                         }, actionListener::onFailure), bulkRequestList.size());
                         for (BulkRequest req : bulkRequestList) {
                             try {
-                                client.bulk(req, groupedListener); //todo why stash context here?
+                                pluginClient.bulk(req, groupedListener); //todo why stash context here?
                             } catch (Exception e) {
                                 log.error(
                                         () -> new ParameterizedMessage("Failed to bulk save {} {}.", batchSize, getEntityName()),
@@ -207,7 +208,7 @@ public abstract class BaseEntityCrudService<Entity extends BaseEntity> {
         SearchRequest searchRequest = new SearchRequest()
                 .source(searchSourceBuilder)
                 .indices(getEntityAliasName());
-        client.search(searchRequest, ActionListener.wrap(
+        pluginClient.search(searchRequest, ActionListener.wrap(
                 listener::onResponse,
                 e -> {
                     if (e instanceof IndexNotFoundException || e instanceof AliasesNotFoundException) {
@@ -230,7 +231,7 @@ public abstract class BaseEntityCrudService<Entity extends BaseEntity> {
             }
             final CreateIndexRequest createIndexRequest = new CreateIndexRequest(getEntityIndexPattern()).mapping(getEntityIndexMapping())
                     .settings(getIndexSettings());
-            client.admin().indices().create(createIndexRequest, ActionListener.wrap(
+            pluginClient.admin().indices().create(createIndexRequest, ActionListener.wrap(
                     r -> {
                         log.debug("{} index created", getEntityName());
                         listener.onResponse(null);

@@ -53,6 +53,7 @@ import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
 import org.opensearch.securityanalytics.util.CorrelationIndices;
 import org.opensearch.securityanalytics.util.DetectorIndices;
 import org.opensearch.securityanalytics.util.IndexUtils;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -83,7 +84,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
 
     private final Settings settings;
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final NamedXContentRegistry xContentRegistry;
 
@@ -103,7 +104,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
 
     @Inject
     public TransportCorrelateFindingAction(TransportService transportService,
-                                           Client client,
+                                           PluginClient pluginClient,
                                            NamedXContentRegistry xContentRegistry,
                                            DetectorIndices detectorIndices,
                                            CorrelationIndices correlationIndices,
@@ -112,7 +113,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                                            Settings settings,
                                            ActionFilters actionFilters, CorrelationAlertService correlationAlertService, NotificationService notificationService) {
         super(AlertingActions.SUBSCRIBE_FINDINGS_ACTION_NAME, transportService, actionFilters, PublishFindingsRequest::new);
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.xContentRegistry = xContentRegistry;
         this.detectorIndices = detectorIndices;
         this.correlationIndices = correlationIndices;
@@ -214,12 +215,11 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
             this.request = request;
             this.listener = listener;
             this.response =new AtomicReference<>();
-            this.joinEngine = new JoinEngine(client, request, xContentRegistry, corrTimeWindow, indexTimeout, this, logTypeService, enableAutoCorrelation, correlationAlertService, notificationService, user);
-            this.vectorEmbeddingsEngine = new VectorEmbeddingsEngine(client, indexTimeout, corrTimeWindow, this);
+            this.joinEngine = new JoinEngine(pluginClient, request, xContentRegistry, corrTimeWindow, indexTimeout, this, logTypeService, enableAutoCorrelation, correlationAlertService, notificationService, user);
+            this.vectorEmbeddingsEngine = new VectorEmbeddingsEngine(pluginClient, indexTimeout, corrTimeWindow, this);
         }
 
         void start() {
-            TransportCorrelateFindingAction.this.threadPool.getThreadContext().stashContext();
             String monitorId = request.getMonitorId();
             Finding finding = request.getFinding();
 
@@ -244,7 +244,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                 searchRequest.preference(Preference.PRIMARY_FIRST.type());
                 searchRequest.setCancelAfterTimeInterval(TimeValue.timeValueSeconds(30L));
 
-                client.search(searchRequest, ActionListener.wrap(response -> {
+                pluginClient.search(searchRequest, ActionListener.wrap(response -> {
                     if (response.isTimedOut()) {
                         onFailures(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
                     }
@@ -278,7 +278,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                 if (!IndexUtils.correlationIndexUpdated) {
                     IndexUtils.updateIndexMapping(
                             CorrelationIndices.CORRELATION_HISTORY_WRITE_INDEX,
-                            CorrelationIndices.correlationMappings(), clusterService.state(), client.admin().indices(),
+                            CorrelationIndices.correlationMappings(), clusterService.state(), pluginClient.admin().indices(),
                             ActionListener.wrap(response -> {
                                 if (response.isAcknowledged()) {
                                     IndexUtils.correlationIndexUpdated();
@@ -312,7 +312,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                                     long findingTimestamp = request.getFinding().getTimestamp().toEpochMilli();
                                     SearchRequest searchMetadataIndexRequest = getSearchMetadataIndexRequest();
 
-                                    client.search(searchMetadataIndexRequest, ActionListener.wrap(searchMetadataResponse -> {
+                                    pluginClient.search(searchMetadataIndexRequest, ActionListener.wrap(searchMetadataResponse -> {
                                         if (searchMetadataResponse.getHits().getHits().length == 0) {
                                             onFailures(new ResourceNotFoundException(
                                                     "Failed to find hits in metadata index for finding id {}", request.getFinding().getId()));
@@ -327,10 +327,10 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                                             try {
                                                 IndexRequest scoreIndexRequest = getCorrelationMetadataIndexRequest(id, newScoreTimestamp);
 
-                                                client.index(scoreIndexRequest, ActionListener.wrap(indexResponse -> {
+                                                pluginClient.index(scoreIndexRequest, ActionListener.wrap(indexResponse -> {
                                                     SearchRequest searchRequest = getSearchLogTypeIndexRequest();
 
-                                                    client.search(searchRequest, ActionListener.wrap(searchResponse -> {
+                                                    pluginClient.search(searchRequest, ActionListener.wrap(searchResponse -> {
                                                         if (searchResponse.isTimedOut()) {
                                                             onFailures(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
                                                         }
@@ -376,7 +376,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                     long findingTimestamp = this.request.getFinding().getTimestamp().toEpochMilli();
                     SearchRequest searchMetadataIndexRequest = getSearchMetadataIndexRequest();
 
-                    client.search(searchMetadataIndexRequest, ActionListener.wrap(response -> {
+                    pluginClient.search(searchMetadataIndexRequest, ActionListener.wrap(response -> {
                         if (response.getHits().getHits().length == 0) {
                             onFailures(new ResourceNotFoundException(
                                     "Failed to find hits in metadata index for finding id {}", request.getFinding().getId()));
@@ -389,10 +389,10 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
                             if (newScoreTimestamp > scoreTimestamp) {
                                 IndexRequest scoreIndexRequest = getCorrelationMetadataIndexRequest(id, newScoreTimestamp);
 
-                                client.index(scoreIndexRequest, ActionListener.wrap(indexResponse -> {
+                                pluginClient.index(scoreIndexRequest, ActionListener.wrap(indexResponse -> {
                                     SearchRequest searchRequest = getSearchLogTypeIndexRequest();
 
-                                    client.search(searchRequest, ActionListener.wrap(searchResponse -> {
+                                    pluginClient.search(searchRequest, ActionListener.wrap(searchResponse -> {
                                         if (searchResponse.isTimedOut()) {
                                             onFailures(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
                                         }
@@ -459,7 +459,7 @@ public class TransportCorrelateFindingAction extends HandledTransportAction<Acti
         }
 
         private void insertFindings(float timestampFeature, SearchRequest searchRequest, Map<String, List<String>> correlatedFindings, String detectorType, List<String> correlationRules, Finding orphanFinding) {
-            client.search(searchRequest, ActionListener.wrap(response -> {
+            pluginClient.search(searchRequest, ActionListener.wrap(response -> {
                 if (response.isTimedOut()) {
                     onFailures(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
                 }

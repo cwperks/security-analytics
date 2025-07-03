@@ -40,8 +40,6 @@ public class TransportCreateIndexMappingsAction extends HandledTransportAction<C
 
     @Override
     protected void doExecute(Task task, CreateIndexMappingsRequest request, ActionListener<AcknowledgedResponse> actionListener) {
-        this.threadPool.getThreadContext().stashContext();
-
         mapperService.createMappingAction(
                 request.getIndexName(),
                 request.getRuleTopic(),

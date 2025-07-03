@@ -6,6 +6,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.securityanalytics.model.threatintel.ThreatIntelAlert;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.transport.client.Client;
 
@@ -26,8 +27,8 @@ public class ThreatIntelAlertService extends BaseEntityCrudService<ThreatIntelAl
 
     private static final Logger log = LogManager.getLogger(ThreatIntelAlertService.class);
 
-    public ThreatIntelAlertService(Client client, ClusterService clusterService, NamedXContentRegistry xContentRegistry) {
-        super(client, clusterService, xContentRegistry);
+    public ThreatIntelAlertService(PluginClient pluginClient, ClusterService clusterService, NamedXContentRegistry xContentRegistry) {
+        super(pluginClient, clusterService, xContentRegistry);
     }
 
     @Override

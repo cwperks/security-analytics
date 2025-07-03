@@ -67,7 +67,7 @@ public class RuleIndices {
 
     private static final Logger log = LogManager.getLogger(RuleIndices.class);
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final ClusterService clusterService;
 
@@ -75,8 +75,8 @@ public class RuleIndices {
 
     private final LogTypeService logTypeService;
 
-    public RuleIndices(LogTypeService logTypeService, Client client, ClusterService clusterService, ThreadPool threadPool) {
-        this.client = client;
+    public RuleIndices(LogTypeService logTypeService, PluginClient pluginClient, ClusterService clusterService, ThreadPool threadPool) {
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.threadPool = threadPool;
         this.logTypeService = logTypeService;
@@ -96,7 +96,7 @@ public class RuleIndices {
             CreateIndexRequest indexRequest = new CreateIndexRequest(getRuleIndex(isPrepackaged))
                     .mapping(ruleMappings())
                     .settings(indexSettings);
-            client.admin().indices().create(indexRequest, actionListener);
+            pluginClient.admin().indices().create(indexRequest, actionListener);
         }
     }
 
@@ -117,7 +117,7 @@ public class RuleIndices {
 
             bulkRequest.add(indexRequest);
         }
-        client.bulk(bulkRequest, actionListener);
+        pluginClient.bulk(bulkRequest, actionListener);
     }
 
     public boolean ruleIndexExists(boolean isPrepackaged) {
@@ -182,7 +182,7 @@ public class RuleIndices {
             } else if (!IndexUtils.prePackagedRuleIndexUpdated) {
                 IndexUtils.updateIndexMapping(
                         Rule.PRE_PACKAGED_RULES_INDEX,
-                        RuleIndices.ruleMappings(), clusterService.state(), client.admin().indices(),
+                        RuleIndices.ruleMappings(), clusterService.state(), pluginClient.admin().indices(),
                         updateListener,
                         false
                 );
@@ -211,7 +211,7 @@ public class RuleIndices {
     }
 
     public void deleteRules(ActionListener<BulkByScrollResponse> listener) {
-        new DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+        new DeleteByQueryRequestBuilder(pluginClient, DeleteByQueryAction.INSTANCE)
                 .source(Rule.PRE_PACKAGED_RULES_INDEX)
                 .filter(QueryBuilders.matchAllQuery())
                 .refresh(true)
@@ -222,7 +222,7 @@ public class RuleIndices {
         SearchRequest request = new SearchRequest(Rule.PRE_PACKAGED_RULES_INDEX)
                 .source(new SearchSourceBuilder().size(0))
                 .preference(Preference.PRIMARY_FIRST.type());
-        client.search(request, listener);
+        pluginClient.search(request, listener);
     }
 
     public void searchRules(String logTypeName, ActionListener<SearchResponse> listener) {
@@ -239,7 +239,7 @@ public class RuleIndices {
                         .query(queryBuilder)
                         .size(0));
 
-        client.search(searchRequest, listener);
+        pluginClient.search(searchRequest, listener);
     }
 
     private List<String> getRules(List<Path> listOfRules) {
@@ -339,7 +339,7 @@ public class RuleIndices {
                 searchRequest.indices(LogTypeService.LOG_TYPE_INDEX);
                 searchRequest.source(searchSourceBuilder);
 
-                client.search(searchRequest, new ActionListener<>() {
+                pluginClient.search(searchRequest, new ActionListener<>() {
                     @Override
                     public void onResponse(SearchResponse response) {
                         if (response.isTimedOut()) {

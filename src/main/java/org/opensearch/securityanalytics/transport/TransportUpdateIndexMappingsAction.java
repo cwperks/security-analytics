@@ -47,7 +47,6 @@ public class TransportUpdateIndexMappingsAction extends HandledTransportAction<U
 
     @Override
     protected void doExecute(Task task, UpdateIndexMappingsRequest request, ActionListener<AcknowledgedResponse> actionListener) {
-        this.threadPool.getThreadContext().stashContext();
         try {
             IndexMetadata index = clusterService.state().metadata().index(request.getIndexName());
             if (index == null) {

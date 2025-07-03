@@ -57,6 +57,7 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.securityanalytics.model.CustomLogType;
 import org.opensearch.securityanalytics.model.FieldMappingDoc;
 import org.opensearch.securityanalytics.model.LogType;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.SecurityAnalyticsException;
 import org.opensearch.transport.client.Client;
 
@@ -82,7 +83,7 @@ public class LogTypeService {
 
     private static volatile boolean isConfigIndexInitialized;
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final ClusterService clusterService;
 
@@ -95,8 +96,8 @@ public class LogTypeService {
     public int logTypeMappingVersion;
 
     @Inject
-    public LogTypeService(Client client, ClusterService clusterService, NamedXContentRegistry xContentRegistry, BuiltinLogTypeLoader builtinLogTypeLoader) {
-        this.client = client;
+    public LogTypeService(PluginClient pluginClient, ClusterService clusterService, NamedXContentRegistry xContentRegistry, BuiltinLogTypeLoader builtinLogTypeLoader) {
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
         this.builtinLogTypeLoader = builtinLogTypeLoader;
@@ -119,7 +120,7 @@ public class LogTypeService {
                     .size(MAX_LOG_TYPE_COUNT)
             ));
             searchRequest.preference(Preference.PRIMARY_FIRST.type());
-            client.search(
+            pluginClient.search(
                 searchRequest,
                 ActionListener.delegateFailure(
                     listener,
@@ -149,7 +150,7 @@ public class LogTypeService {
             searchRequest.indices(LogTypeService.LOG_TYPE_INDEX);
             searchRequest.source(searchSourceBuilder);
             searchRequest.preference("_primary");
-            client.search(
+            pluginClient.search(
                     searchRequest,
                     ActionListener.delegateFailure(
                             listener,
@@ -181,7 +182,7 @@ public class LogTypeService {
             searchRequest.indices(LogTypeService.LOG_TYPE_INDEX);
             searchRequest.source(searchSourceBuilder);
             searchRequest.preference("_primary");
-            client.search(
+            pluginClient.search(
                     searchRequest,
                     ActionListener.delegateFailure(
                             listener,
@@ -210,7 +211,7 @@ public class LogTypeService {
             searchRequest.indices(LogTypeService.LOG_TYPE_INDEX);
             searchRequest.source(searchSourceBuilder);
             searchRequest.preference("_primary");
-            client.search(
+            pluginClient.search(
                     searchRequest,
                     ActionListener.delegateFailure(
                             listener,
@@ -248,7 +249,7 @@ public class LogTypeService {
                     });
             // Index all fieldMapping docs
             logger.info("Indexing [" + bulkRequest.numberOfActions() + "] fieldMappingDocs");
-            client.bulk(
+            pluginClient.bulk(
                     bulkRequest,
                     ActionListener.delegateFailure(listener, (l, r) -> {
                         if (r.hasFailures()) {
@@ -276,7 +277,7 @@ public class LogTypeService {
         searchRequest.indices(LogTypeService.LOG_TYPE_INDEX);
         searchRequest.source(searchSourceBuilder);
 
-        client.search(searchRequest, new ActionListener<>() {
+        pluginClient.search(searchRequest, new ActionListener<>() {
             @Override
             public void onResponse(SearchResponse response) {
                 if (response.isTimedOut()) {
@@ -299,7 +300,7 @@ public class LogTypeService {
                         if (bulkRequest.numberOfActions() > 0) {
                             bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
                             logger.info("Indexing [" + bulkRequest.numberOfActions() + "] customLogTypes");
-                            client.bulk(
+                            pluginClient.bulk(
                                     bulkRequest,
                                     ActionListener.delegateFailure(listener, (l, r) -> {
                                         if (r.hasFailures()) {
@@ -388,7 +389,7 @@ public class LogTypeService {
         searchRequest.source(new SearchSourceBuilder().query(QueryBuilders.boolQuery()
                 .mustNot(QueryBuilders.existsQuery("source"))).size(10000));
         searchRequest.preference(Preference.PRIMARY_FIRST.type());
-        client.search(
+        pluginClient.search(
             searchRequest,
             ActionListener.delegateFailure(
                 listener,
@@ -422,7 +423,7 @@ public class LogTypeService {
                 .size(10000)
         );
         searchRequest.preference(Preference.PRIMARY_FIRST.type());
-        client.search(
+        pluginClient.search(
                 searchRequest,
                 ActionListener.delegateFailure(
                         listener,
@@ -466,7 +467,7 @@ public class LogTypeService {
             createIndexRequest.mapping(logTypeIndexMapping());
             createIndexRequest.settings(indexSettings);
             createIndexRequest.cause("auto(sap-logtype api)");
-            client.admin().indices().create(createIndexRequest, new ActionListener<>() {
+            pluginClient.admin().indices().create(createIndexRequest, new ActionListener<>() {
                 @Override
                 public void onResponse(CreateIndexResponse result) {
                     loadBuiltinLogTypes(ActionListener.delegateFailure(
@@ -499,7 +500,7 @@ public class LogTypeService {
             IndexMetadata metadata = state.getMetadata().index(LOG_TYPE_INDEX);
             if (getConfigIndexMappingVersion(metadata) < logTypeMappingVersion) {
                 // The index already exists but doesn't have our mapping
-                client.admin()
+                pluginClient.admin()
                         .indices()
                         .preparePutMapping(LOG_TYPE_INDEX)
                         .setSource(logTypeIndexMapping(), XContentType.JSON)

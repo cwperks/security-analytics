@@ -96,7 +96,6 @@ public class TransportUpdateThreatIntelAlertStatusAction extends HandledTranspor
             listener.onFailure(new OpenSearchStatusException("Do not have permissions to resource", RestStatus.FORBIDDEN));
             return;
         }
-        this.threadPool.getThreadContext().stashContext();
 
         //fetch monitors and search
         SearchRequest threatIntelMonitorsSearchRequest = new SearchRequest();

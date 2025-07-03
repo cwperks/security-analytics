@@ -30,12 +30,12 @@ import static org.opensearch.securityanalytics.settings.SecurityAnalyticsSetting
 public class CorrelationRuleIndices {
     private static final Logger log = LogManager.getLogger(CorrelationRuleIndices.class);
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final ClusterService clusterService;
 
-    public CorrelationRuleIndices(Client client, ClusterService clusterService) {
-        this.client = client;
+    public CorrelationRuleIndices(PluginClient pluginClient, ClusterService clusterService) {
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
     }
 
@@ -57,7 +57,7 @@ public class CorrelationRuleIndices {
             CreateIndexRequest indexRequest = new CreateIndexRequest(CorrelationRule.CORRELATION_RULE_INDEX).mapping(
                 correlationRuleIndexMappings()
             ).settings(indexSettings);
-            client.admin().indices().create(indexRequest, actionListener);
+            pluginClient.admin().indices().create(indexRequest, actionListener);
         }
     }
 

@@ -29,6 +29,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.core.xcontent.XContentParserUtils;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.identity.PluginSubject;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.engine.EngineFactory;
@@ -40,6 +41,7 @@ import org.opensearch.jobscheduler.spi.ScheduledJobRunner;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.ClusterPlugin;
 import org.opensearch.plugins.EnginePlugin;
+import org.opensearch.plugins.IdentityAwarePlugin;
 import org.opensearch.plugins.MapperPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SearchPlugin;
@@ -208,6 +210,7 @@ import org.opensearch.securityanalytics.util.CorrelationIndices;
 import org.opensearch.securityanalytics.util.CorrelationRuleIndices;
 import org.opensearch.securityanalytics.util.CustomLogTypeIndices;
 import org.opensearch.securityanalytics.util.DetectorIndices;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.securityanalytics.util.RuleIndices;
 import org.opensearch.securityanalytics.util.RuleTopicIndices;
 import org.opensearch.threadpool.ThreadPool;
@@ -228,7 +231,7 @@ import static org.opensearch.securityanalytics.threatIntel.model.SATIFSourceConf
 import static org.opensearch.securityanalytics.threatIntel.model.TIFJobParameter.THREAT_INTEL_DATA_INDEX_NAME_PREFIX;
 import static org.opensearch.securityanalytics.util.CorrelationIndices.CORRELATION_ALERT_INDEX;
 
-public class SecurityAnalyticsPlugin extends Plugin implements ActionPlugin, MapperPlugin, SearchPlugin, EnginePlugin, ClusterPlugin, SystemIndexPlugin, JobSchedulerExtension, RemoteMonitorRunnerExtension {
+public class SecurityAnalyticsPlugin extends Plugin implements ActionPlugin, MapperPlugin, SearchPlugin, EnginePlugin, ClusterPlugin, SystemIndexPlugin, IdentityAwarePlugin, JobSchedulerExtension, RemoteMonitorRunnerExtension {
 
     private static final Logger log = LogManager.getLogger(SecurityAnalyticsPlugin.class);
 
@@ -283,6 +286,8 @@ public class SecurityAnalyticsPlugin extends Plugin implements ActionPlugin, Map
 
     private SATIFSourceConfigService saTifSourceConfigService;
 
+    private PluginClient pluginClient;
+
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
         List<SystemIndexDescriptor> descriptors = List.of(
@@ -307,31 +312,32 @@ public class SecurityAnalyticsPlugin extends Plugin implements ActionPlugin, Map
                                                Supplier<RepositoriesService> repositoriesServiceSupplier) {
 
         builtinLogTypeLoader = new BuiltinLogTypeLoader();
+        pluginClient = new PluginClient(client);
         BuiltInTIFMetadataLoader builtInTIFMetadataLoader = new BuiltInTIFMetadataLoader();
-        logTypeService = new LogTypeService(client, clusterService, xContentRegistry, builtinLogTypeLoader);
+        logTypeService = new LogTypeService(pluginClient, clusterService, xContentRegistry, builtinLogTypeLoader);
         detectorIndices = new DetectorIndices(client.admin(), clusterService, threadPool);
         ruleTopicIndices = new RuleTopicIndices(client, clusterService, logTypeService);
         correlationIndices = new CorrelationIndices(client, clusterService);
         customLogTypeIndices = new CustomLogTypeIndices(client.admin(), clusterService);
         indexTemplateManager = new IndexTemplateManager(client, clusterService, indexNameExpressionResolver, xContentRegistry);
-        mapperService = new MapperService(client, clusterService, indexNameExpressionResolver, indexTemplateManager, logTypeService);
-        ruleIndices = new RuleIndices(logTypeService, client, clusterService, threadPool);
-        correlationRuleIndices = new CorrelationRuleIndices(client, clusterService);
-        ThreatIntelFeedDataService threatIntelFeedDataService = new ThreatIntelFeedDataService(clusterService, client, indexNameExpressionResolver, xContentRegistry);
+        mapperService = new MapperService(pluginClient, clusterService, indexNameExpressionResolver, indexTemplateManager, logTypeService);
+        ruleIndices = new RuleIndices(logTypeService, pluginClient, clusterService, threadPool);
+        correlationRuleIndices = new CorrelationRuleIndices(pluginClient, clusterService);
+        ThreatIntelFeedDataService threatIntelFeedDataService = new ThreatIntelFeedDataService(clusterService, pluginClient, indexNameExpressionResolver, xContentRegistry);
         DetectorThreatIntelService detectorThreatIntelService = new DetectorThreatIntelService(threatIntelFeedDataService, client, xContentRegistry);
-        TIFJobParameterService tifJobParameterService = new TIFJobParameterService(client, clusterService);
+        TIFJobParameterService tifJobParameterService = new TIFJobParameterService(pluginClient, clusterService);
         TIFJobUpdateService tifJobUpdateService = new TIFJobUpdateService(clusterService, tifJobParameterService, threatIntelFeedDataService, builtInTIFMetadataLoader);
         TIFLockService threatIntelLockService = new TIFLockService(clusterService, client);
-        saTifSourceConfigService = new SATIFSourceConfigService(client, clusterService, threadPool, xContentRegistry, threatIntelLockService);
-        STIX2IOCFetchService stix2IOCFetchService = new STIX2IOCFetchService(client, clusterService);
+        saTifSourceConfigService = new SATIFSourceConfigService(pluginClient, clusterService, threadPool, xContentRegistry, threatIntelLockService);
+        STIX2IOCFetchService stix2IOCFetchService = new STIX2IOCFetchService(pluginClient, clusterService);
         SATIFSourceConfigManagementService saTifSourceConfigManagementService = new SATIFSourceConfigManagementService(saTifSourceConfigService, threatIntelLockService, stix2IOCFetchService, xContentRegistry, clusterService);
         SecurityAnalyticsRunner.getJobRunnerInstance();
         TIFSourceConfigRunner.getJobRunnerInstance().initialize(clusterService, threatIntelLockService, threadPool, saTifSourceConfigManagementService, saTifSourceConfigService);
-        CorrelationAlertService correlationAlertService = new CorrelationAlertService(client, xContentRegistry);
+        CorrelationAlertService correlationAlertService = new CorrelationAlertService(pluginClient, xContentRegistry);
         NotificationService notificationService = new NotificationService((NodeClient) client, scriptService);
         TIFJobRunner.getJobRunnerInstance().initialize(clusterService, tifJobUpdateService, tifJobParameterService, threatIntelLockService, threadPool, detectorThreatIntelService);
-        IocFindingService iocFindingService = new IocFindingService(client, clusterService, xContentRegistry);
-        ThreatIntelAlertService threatIntelAlertService = new ThreatIntelAlertService(client, clusterService, xContentRegistry);
+        IocFindingService iocFindingService = new IocFindingService(pluginClient, clusterService, xContentRegistry);
+        ThreatIntelAlertService threatIntelAlertService = new ThreatIntelAlertService(pluginClient, clusterService, xContentRegistry);
         SaIoCScanService ioCScanService = new SaIoCScanService(client, clusterService, xContentRegistry, iocFindingService, threatIntelAlertService, notificationService);
         DefaultTifSourceConfigLoaderService defaultTifSourceConfigLoaderService = new DefaultTifSourceConfigLoaderService(builtInTIFMetadataLoader, client, saTifSourceConfigManagementService);
         return List.of(
@@ -339,7 +345,14 @@ public class SecurityAnalyticsPlugin extends Plugin implements ActionPlugin, Map
                 mapperService, indexTemplateManager, builtinLogTypeLoader, builtInTIFMetadataLoader, threatIntelFeedDataService, detectorThreatIntelService,
                 correlationAlertService, notificationService,
                 tifJobUpdateService, tifJobParameterService, threatIntelLockService, saTifSourceConfigService, saTifSourceConfigManagementService, stix2IOCFetchService,
-                ioCScanService, defaultTifSourceConfigLoaderService);
+                ioCScanService, defaultTifSourceConfigLoaderService, pluginClient);
+    }
+
+    @Override
+    public void assignSubject(PluginSubject pluginSubject) {
+        // When security is not installed, the pluginSubject will still be assigned.
+        assert pluginSubject != null;
+        this.pluginClient.setSubject(pluginSubject);
     }
 
     @Override

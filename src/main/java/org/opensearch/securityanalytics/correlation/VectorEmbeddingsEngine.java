@@ -30,6 +30,7 @@ import org.opensearch.securityanalytics.correlation.index.query.CorrelationQuery
 import org.opensearch.securityanalytics.model.CustomLogType;
 import org.opensearch.securityanalytics.transport.TransportCorrelateFindingAction;
 import org.opensearch.securityanalytics.util.CorrelationIndices;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.transport.client.Client;
 
 import java.util.Arrays;
@@ -39,7 +40,7 @@ import java.util.Map;
 
 public class VectorEmbeddingsEngine {
 
-    private final Client client;
+    private final PluginClient pluginClient;
 
     private final TransportCorrelateFindingAction.AsyncCorrelateFindingAction correlateFindingAction;
 
@@ -49,9 +50,9 @@ public class VectorEmbeddingsEngine {
 
     private static final Logger log = LogManager.getLogger(VectorEmbeddingsEngine.class);
 
-    public VectorEmbeddingsEngine(Client client, TimeValue indexTimeout, long corrTimeWindow,
+    public VectorEmbeddingsEngine(PluginClient pluginClient, TimeValue indexTimeout, long corrTimeWindow,
                                   TransportCorrelateFindingAction.AsyncCorrelateFindingAction correlateFindingAction) {
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.indexTimeout = indexTimeout;
         this.corrTimeWindow = corrTimeWindow;
         this.correlateFindingAction = correlateFindingAction;
@@ -63,7 +64,7 @@ public class VectorEmbeddingsEngine {
         String correlationId = tags.get("correlation_id").toString();
 
         long findingTimestamp = finding.getTimestamp().toEpochMilli();
-        client.search(searchRequest, ActionListener.wrap(response -> {
+        pluginClient.search(searchRequest, ActionListener.wrap(response -> {
             if (response.isTimedOut()) {
                 onFailure(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
             }
@@ -100,7 +101,7 @@ public class VectorEmbeddingsEngine {
                 mSearchRequest.add(request);
             }
 
-            client.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
+            pluginClient.multiSearch(mSearchRequest, ActionListener.wrap(items -> {
                 MultiSearchResponse.Item[] responses = items.getResponses();
                 BulkRequest bulkRequest = new BulkRequest();
                 bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
@@ -183,7 +184,7 @@ public class VectorEmbeddingsEngine {
                 }
 
                 if (totalNeighbors > 0L) {
-                    client.bulk(bulkRequest, ActionListener.wrap( bulkResponse -> {
+                    pluginClient.bulk(bulkRequest, ActionListener.wrap( bulkResponse -> {
                         if (bulkResponse.hasFailures()) {
                             onFailure(new OpenSearchStatusException("Correlation of finding failed", RestStatus.INTERNAL_SERVER_ERROR));
                         }
@@ -208,7 +209,7 @@ public class VectorEmbeddingsEngine {
         String correlationId = tags.get("correlation_id").toString();
         long findingTimestamp = finding.getTimestamp().toEpochMilli();
 
-        client.search(searchRequest, ActionListener.wrap(response -> {
+        pluginClient.search(searchRequest, ActionListener.wrap(response -> {
             if (response.isTimedOut()) {
                 onFailure(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
             }
@@ -235,7 +236,7 @@ public class VectorEmbeddingsEngine {
                             .timeout(indexTimeout)
                             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-                    client.index(indexRequest, ActionListener.wrap(indexResponse -> {
+                    pluginClient.index(indexRequest, ActionListener.wrap(indexResponse -> {
                         if (indexResponse.status().equals(RestStatus.OK)) {
                             try {
                                 float[] corrVector = new float[3];
@@ -281,7 +282,7 @@ public class VectorEmbeddingsEngine {
                                 .timeout(indexTimeout)
                                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-                        client.index(indexRequest, ActionListener.wrap(indexResponse -> {
+                        pluginClient.index(indexRequest, ActionListener.wrap(indexResponse -> {
                             if (indexResponse.status().equals(RestStatus.OK)) {
                                 correlateFindingAction.onOperation();
                                 try {
@@ -335,7 +336,7 @@ public class VectorEmbeddingsEngine {
                         request.preference(Preference.PRIMARY_FIRST.type());
                         request.setCancelAfterTimeInterval(TimeValue.timeValueSeconds(30L));
 
-                        client.search(request, ActionListener.wrap(searchResponse -> {
+                        pluginClient.search(request, ActionListener.wrap(searchResponse -> {
                             if (searchResponse.isTimedOut()) {
                                 onFailure(new OpenSearchStatusException("Search request timed out", RestStatus.REQUEST_TIMEOUT));
                             }
@@ -392,7 +393,7 @@ public class VectorEmbeddingsEngine {
                                             .timeout(indexTimeout)
                                             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-                                    client.index(indexRequest, ActionListener.wrap(indexResponse -> {
+                                    pluginClient.index(indexRequest, ActionListener.wrap(indexResponse -> {
                                         if (indexResponse.status().equals(RestStatus.OK)) {
                                             try {
                                                 float[] corrVector = new float[3];
@@ -442,7 +443,7 @@ public class VectorEmbeddingsEngine {
                 .timeout(indexTimeout)
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-        client.index(indexRequest, ActionListener.wrap(response -> {
+        pluginClient.index(indexRequest, ActionListener.wrap(response -> {
             if (response.status().equals(RestStatus.CREATED)) {
                 correlateFindingAction.onOperation();
             } else {

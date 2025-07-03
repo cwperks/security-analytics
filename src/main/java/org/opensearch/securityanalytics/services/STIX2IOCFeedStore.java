@@ -31,11 +31,10 @@ import org.opensearch.securityanalytics.commons.model.UpdateAction;
 import org.opensearch.securityanalytics.commons.store.FeedStore;
 import org.opensearch.securityanalytics.model.STIX2IOC;
 import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
-import org.opensearch.securityanalytics.threatIntel.common.StashedThreadContext;
 import org.opensearch.securityanalytics.threatIntel.model.DefaultIocStoreConfig;
 import org.opensearch.securityanalytics.threatIntel.model.SATIFSourceConfig;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.transport.RemoteTransportException;
-import org.opensearch.transport.client.Client;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -68,19 +67,19 @@ public class STIX2IOCFeedStore implements FeedStore {
 
     Instant startTime = Instant.now();
 
-    private Client client;
+    private PluginClient pluginClient;
     private ClusterService clusterService;
     private SATIFSourceConfig saTifSourceConfig;
     private ActionListener<STIX2IOCFetchService.STIX2IOCFetchResponse> baseListener;
     private Integer batchSize;
 
     public STIX2IOCFeedStore(
-            Client client,
+            PluginClient pluginClient,
             ClusterService clusterService,
             SATIFSourceConfig saTifSourceConfig,
             ActionListener<STIX2IOCFetchService.STIX2IOCFetchResponse> listener) {
         super();
-        this.client = client;
+        this.pluginClient = pluginClient;
         this.clusterService = clusterService;
         this.saTifSourceConfig = saTifSourceConfig;
         this.baseListener = listener;
@@ -177,7 +176,7 @@ public class STIX2IOCFeedStore implements FeedStore {
 
         for (BulkRequest req : bulkRequestList) {
             try {
-                StashedThreadContext.run(client, () -> client.bulk(req, bulkResponseListener));
+                pluginClient.bulk(req, bulkResponseListener);
             } catch (OpenSearchException e) {
                 log.error("Failed to save IOCs for config {}", saTifSourceConfig.getId(), e);
                 baseListener.onFailure(e);
@@ -245,7 +244,7 @@ public class STIX2IOCFeedStore implements FeedStore {
                             .put("index.auto_expand_replicas", minSystemIndexReplicas + "-" + maxSystemIndexReplicas)
                             .build()
                     );
-            client.admin().indices().create(indexRequest, ActionListener.wrap(
+            pluginClient.admin().indices().create(indexRequest, ActionListener.wrap(
                     r -> {
                         log.info("Created system index {}", feedIndexName);
                         listener.onResponse(r);

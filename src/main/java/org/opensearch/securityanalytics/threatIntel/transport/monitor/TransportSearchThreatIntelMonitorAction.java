@@ -77,7 +77,8 @@ public class TransportSearchThreatIntelMonitorAction extends HandledTransportAct
             listener.onFailure(new OpenSearchStatusException("Do not have permissions to resource", RestStatus.FORBIDDEN));
             return;
         }
-        this.threadPool.getThreadContext().stashContext();
+        // TODO Figure out how to replace this
+        // this.threadPool.getThreadContext().stashContext();
 
         //TODO change search request to fetch threat intel monitors
         AlertingPluginInterface.INSTANCE.searchMonitors((NodeClient) client, new SearchMonitorRequest(request.searchRequest()), ActionListener.wrap(

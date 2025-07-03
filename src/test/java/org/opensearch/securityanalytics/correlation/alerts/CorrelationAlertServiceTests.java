@@ -10,6 +10,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.securityanalytics.correlation.alert.CorrelationAlertService;
 import org.opensearch.securityanalytics.correlation.alert.CorrelationAlertsList;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.transport.client.Client;
 
@@ -26,9 +27,9 @@ public class CorrelationAlertServiceTests  extends OpenSearchTestCase {
 
     public void testGetActiveAlerts() {
         // Mock setup
-        Client client = mock(Client.class);
+        PluginClient pluginClient = mock(PluginClient.class);
         NamedXContentRegistry xContentRegistry = mock(NamedXContentRegistry.class);
-        CorrelationAlertService alertsService = spy(new CorrelationAlertService(client, xContentRegistry));
+        CorrelationAlertService alertsService = spy(new CorrelationAlertService(pluginClient, xContentRegistry));
 
 
         // Fake data

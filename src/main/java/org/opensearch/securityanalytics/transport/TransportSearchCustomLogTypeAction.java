@@ -20,6 +20,7 @@ import org.opensearch.securityanalytics.action.SearchCustomLogTypeAction;
 import org.opensearch.securityanalytics.action.SearchCustomLogTypeRequest;
 import org.opensearch.securityanalytics.logtype.LogTypeService;
 import org.opensearch.securityanalytics.settings.SecurityAnalyticsSettings;
+import org.opensearch.securityanalytics.util.PluginClient;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -71,7 +72,6 @@ public class TransportSearchCustomLogTypeAction extends HandledTransportAction<S
             addFilter(user, request.searchRequest().source(), "detector.user.backend_roles.keyword");
         }
 
-        this.threadPool.getThreadContext().stashContext();
         logTypeService.searchLogTypes(request.searchRequest(), new ActionListener<>() {
             @Override
             public void onResponse(SearchResponse response) {
