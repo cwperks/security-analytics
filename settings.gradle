@@ -4,3 +4,5 @@
  */
 
 rootProject.name = 'opensearch-security-analytics'
+include ':commons:utils'
+include ':commons:tif'
