@@ -207,6 +207,11 @@ dependencies {
     implementation 'net.minidev:accessors-smart:2.5.2'
     implementation "com.google.guava:guava:32.1.3-jre"
 
+    // Re-declare deps that the root source code uses directly but are excluded
+    // from the commons:tif transitive graph to avoid OpenSearch version conflicts
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+    compileOnly 'software.amazon.awssdk:sts:2.25.42'
+
     api(project(':commons:tif')) {
         // Exclude deps provided by the OpenSearch runtime to avoid version conflicts
         // with the opensearch.opensearchplugin strict resolution strategy
