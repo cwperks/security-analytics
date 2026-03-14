@@ -91,15 +91,18 @@ ext {
     }
 }
 
-licenseHeaders.enabled = false
-testingConventions.enabled = false
-forbiddenApis.ignoreFailures = true
-
-dependencyLicenses.enabled = false
-thirdPartyAudit.enabled = false
-forbiddenApisTest.ignoreFailures = true
-validateNebulaPom.enabled = false
-loggerUsageCheck.enabled = false
+// These must be in afterEvaluate so they override the opensearch.opensearchplugin
+// defaults which are also applied in afterEvaluate
+afterEvaluate {
+    licenseHeaders.enabled = false
+    testingConventions.enabled = false
+    forbiddenApis.ignoreFailures = true
+    dependencyLicenses.enabled = false
+    thirdPartyAudit.enabled = false
+    forbiddenApisTest.ignoreFailures = true
+    validateNebulaPom.enabled = false
+    loggerUsageCheck.enabled = false
+}
 
 opensearchplugin {
     name 'opensearch-security-analytics'
