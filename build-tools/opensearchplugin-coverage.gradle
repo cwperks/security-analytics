@@ -5,6 +5,11 @@
 
 apply plugin: 'jacoco'
 
+jacoco {
+    // 0.8.12+ fixes the Java 21 bootstrap classloader LinkageError
+    toolVersion = '0.8.12'
+}
+
 /**
  * OpenSearch Plugin build tools don't work with the Gradle Jacoco Plugin to report coverage out of the box.
  *
